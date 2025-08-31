@@ -11,10 +11,16 @@ import { Server } from "socket.io";
 const app = express();
 const server = http.createServer(app);
 
+// Allowed frontend origins (local + deployed)
+const allowedOrigins = [
+  "http://localhost:5173",
+  process.env.FRONTEND_URL, // your Vercel frontend
+].filter(Boolean); // removes undefined values
+
 // Initialize socket.io server
 export const io = new Server(server, {
   cors: {
-    origin: process.env.FRONTEND_URL || "http://localhost:5173", // ✅ your frontend origin
+    origin: allowedOrigins,
     credentials: true,
   },
 });
@@ -41,10 +47,18 @@ io.on("connection", (socket) => {
 
 // Middleware setup
 app.use(express.json({ limit: "4mb" }));
-app.use(cors({
-  origin: process.env.FRONTEND_URL || "http://localhost:5173",
-  credentials: true,
-}));
+app.use(
+  cors({
+    origin: (origin, callback) => {
+      if (!origin || allowedOrigins.includes(origin)) {
+        callback(null, true);
+      } else {
+        callback(new Error("Not allowed by CORS"));
+      }
+    },
+    credentials: true,
+  })
+);
 
 // Routes setup
 app.use("/api/status", (req, res) => res.send("Server is live"));
@@ -55,4 +69,4 @@ app.use("/api/messages", messageRouter);
 await connectDB();
 
 const PORT = process.env.PORT || 5000;
-server.listen(PORT, () => console.log("server is running on PORT " + PORT));
+server.listen(PORT, () => console.log("✅ Server is running on PORT " + PORT));
